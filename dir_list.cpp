@@ -22,6 +22,7 @@ vector<string> sd_list;
 string sample;
 string ls;
 int no_samples;
+int no_loops;
 int counter;
 int no_sd;
 bool usb;
@@ -37,7 +38,7 @@ vector<string> alphabaticallySort(vector<string> a){
 	return a;
 }
 
-vector<string> load_wav(string location)
+vector<string> load_wav(string location, bool sd, bool loops)
 {
 vector<string> a;
   
@@ -51,15 +52,25 @@ vector<string> a;
       sample = ent->d_name;
         if((sample.compare("..") > 0))
         {
+        if(sd)
+        {
+          a.push_back(ent->d_name);
+          no_sd++;
+        }
+        else
+        { 
          a.push_back(ent->d_name);
-         no_samples++;
+         
+         if(loops) no_loops++;
+         else no_samples++;
          counter++;
+        }
          //cout<<sample.c_str()<<endl;
         }
       }
       closedir(dir);
     }
-  else  cout << "Error Opening DIR" << endl;
+  else  cout << "Error Opening DIR "<< location.c_str()<< endl;
       
   return a;
 }
@@ -94,70 +105,63 @@ int main(void) {
   
   cout << "Hello World" << endl;
   
-  //string ls = GetStdoutFromCommand("ls -l /dev/disk/by-uuid/");
-  ls = GetStdoutFromCommand("ls -l /dev/sd*[a-z]", true);
-  cout << "LS: " << ls << endl;
-  
-  if(ls.length()>55)//then there must be more than one disk
+ 
+  sd_list = load_wav("/media/pi/", true, false);
+  cout << "No. USBs: " << no_sd <<endl;
+  for(int i = 0; i<no_sd; i++)
   {
-    usb = true;
-    istringstream iss(ls);
-    string s;
-    while (getline(iss, s, ' ' ) ) {
-      sd_list.push_back(s);
-      no_sd++;
-    }
-    
-    for(int i=0;i<no_sd;i+=11) cout<<sd_list[i]<<endl;
-    
-    if((dir = opendir ("/media/rpi_usb/")) != NULL)
+    sample = "/media/pi/" + sd_list[i] + "/SAMPLES";
+    transfer_list = load_wav(sample, false, false);
+    transfer_list = alphabaticallySort(transfer_list);
+    for(int j = 0; j<counter; j++)
     {
-        closedir(dir);
-        cout<<"DIR exists"<<endl;
+    sample_list.push_back(("/media/pi/"+sd_list[i]+"/"+transfer_list[j]));
     }
-    else
+    transfer_list.clear();
+    
+    
+    sample = "/media/pi/" + sd_list[i] + "/LOOPS";
+    transfer_list = load_wav(sample, false, true);
+    transfer_list = alphabaticallySort(transfer_list);
+    for(int j = 0; j<counter; j++)
     {
-        ls = GetStdoutFromCommand("sudo mkdir /media/rpi_usb", true);
-        cout << "mkdir: " << ls << endl;
+    loop_list.push_back(("/media/pi/"+sd_list[i]+"/"+transfer_list[j]));
+    }
+    transfer_list.clear();
+    
+    
+  }
 
-        ls = GetStdoutFromCommand("sudo chown -R pi:pi /media/rpi_usb", true);
-        cout << "chown: " << ls << endl;
-    }
-   
-  ls = "sudo mount" + sd_list[11] + "/media/rpi_usb -o uid=pi,gid=pi";
-  ls = GetStdoutFromCommand(ls, true); //assume that the first disk is the sd card and second is usb. Ignore everything else.
-  cout << "mount: " << ls << endl;
-  }
-  
-  if(usb) //load usbs first
-  {
-  sample_list = load_wav("/media/rpi_usb/SAMPLES");
-  sample_list = alphabaticallySort(sample_list);
-  loop_list = load_wav("/media/rpi_usb/LOOPS");
-  sample_list = alphabaticallySort(loop_list);
-  }
-  
-  transfer_list = load_wav("./SAMPLES");
+
+  transfer_list.clear();
+  transfer_list = load_wav("./SAMPLES", false, false);
   transfer_list = alphabaticallySort(transfer_list);
   for(int i = 0; i<counter; i++)
   {
-    sample_list.push_back(transfer_list[i]);
+    sample_list.push_back(("./SAMPLES/"+transfer_list[i]));
   }
   
-  
-  loop_list = load_wav("./LOOPS");
+  transfer_list.clear();
+  transfer_list = load_wav("./LOOPS", false, true);
   transfer_list = alphabaticallySort(transfer_list);
   for(int i = 0; i<counter; i++)
   {
-    loop_list.push_back(transfer_list[i]);
+    loop_list.push_back(("./LOOPS/"+transfer_list[i]));
   }
   
-  cout << "Total Files Found:" << no_samples <<endl;
+  for(int i =0; i<no_samples; i++) cout<<sample_list[i]<<endl;
+  for(int i =0; i<no_loops; i++) cout<<loop_list[i]<<endl;
+  
+  cout << "No Samples:" << no_samples <<endl;
+  cout << "No Loops:" << no_loops <<endl;
   
   //find sensitivity
-  if(usb)ls = GetStdoutFromCommand("/media/rpi_usb/sense.txt", false);
+  if(no_sd>0)
+  {
+  sample = "/media/pi/" + sd_list[0] + "/sense.txt";
+  ls = GetStdoutFromCommand(sample, false);
+  }
   else ls = GetStdoutFromCommand("sense.txt", false);
-  
   sense = stoi(ls);
   cout << "Sensitivity: " << sense << endl;
   
